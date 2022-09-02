@@ -1,0 +1,175 @@
+version: "3.9"
+services:
+  coredns:
+    container_name: coredns
+    image: coredns/coredns:1.9.3
+    command:
+      - -conf
+      - /etc/coredns/Corefile
+    volumes:
+      - ./containers/coredns/Corefile:/etc/coredns/Corefile:ro
+      - ./containers/coredns/zones:/etc/coredns/zones:ro
+    networks:
+      dns-server:
+        ipv4_address: 172.16.240.10
+
+  websocket-0:
+    container_name: websocket-0
+    image: solsson/websocat
+    command:
+      - -s 
+      - "0.0.0.0:10010"
+    networks:
+      websocket-server:
+        ipv4_address: 172.16.238.10
+
+  websocket-1:
+    container_name: websocket-1
+    image: solsson/websocat
+    command:
+      - -s
+      - "0.0.0.0:10010"
+    networks:
+      websocket-server:
+        ipv4_address: 172.16.238.11
+
+  websocket-2:
+    container_name: websocket-2
+    image: solsson/websocat
+    command:
+      - -s
+      - "0.0.0.0:10010"
+    networks:
+      websocket-server:
+        ipv4_address: 172.16.238.12
+
+  websocket-3:
+    container_name: websocket-3
+    image: solsson/websocat
+    command:
+      - -s
+      - "0.0.0.0:10010"
+    networks:
+      websocket-server:
+        ipv4_address: 172.16.238.13
+
+  websocket-4:
+    container_name: websocket-4
+    image: solsson/websocat
+    command:
+      - -s
+      - "0.0.0.0:10010"
+    networks:
+      websocket-server:
+        ipv4_address: 172.16.238.14
+
+  websocket-5:
+    container_name: websocket-5
+    image: solsson/websocat
+    command:
+      - -s
+      - "0.0.0.0:10010"
+    networks:
+      websocket-server:
+        ipv4_address: 172.16.238.15
+
+  nginx-old-proxy:
+    container_name: nginx-old-proxy
+    image: nginx:1.18.0
+    volumes:
+      - ./containers/nginx-old-proxy/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./containers/nginx-old-proxy/sites-enabled/default.conf:/etc/nginx/conf.d/default.conf:ro
+    dns:
+      - 172.16.240.10
+    networks:
+      - dns-server
+      - websocket-proxy
+      - websocket-server
+      - websocket-client
+    depends_on:
+      - coredns
+      - websocket-0
+      - websocket-1
+      - websocket-2
+      - websocket-3
+      - websocket-4
+      - websocket-5
+
+  nginx-new-proxy:
+    container_name: nginx-new-proxy
+    image: nginx:1.18.0
+    dns:
+      - 172.16.240.10
+    volumes:
+      - ./containers/nginx-new-proxy/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./containers/nginx-new-proxy/sites-enabled/default.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - dns-server
+      - websocket-proxy
+      - websocket-server
+      - websocket-client
+    depends_on:
+      - coredns
+      - websocket-0
+      - websocket-1
+      - websocket-2
+      - websocket-3
+      - websocket-4
+      - websocket-5
+  
+  envoy-proxy:
+    container_name: envoy-proxy
+    image: envoyproxy/envoy:v1.23.1
+    dns:
+      - 172.16.240.10
+    command:
+      - -c 
+      - /etc/envoy/config/config.yaml
+    volumes:
+      - ./containers/envoy-proxy/config.yaml:/etc/envoy/config/config.yaml:ro
+    networks:
+      - dns-server
+      - websocket-proxy
+      - websocket-server
+      - websocket-client
+    depends_on:
+      - coredns
+      - websocket-0
+      - websocket-1
+      - websocket-2
+      - websocket-3
+      - websocket-4
+      - websocket-5
+
+  e2e_test:
+    container_name: e2e_test
+    build: .
+    dns:
+      - 172.16.240.10
+    volumes:
+      - ./containers/coredns/zones:/app/containers/coredns/zones
+    networks:
+      - dns-server
+      - websocket-client
+      - websocket-proxy
+      - websocket-server
+    depends_on:
+      - coredns
+      - nginx-old-proxy
+      - nginx-new-proxy
+
+networks:
+  dns-server: 
+    ipam:
+      driver: default
+      config:
+        - subnet: "172.16.240.0/24"
+
+  websocket-client: {}
+  websocket-proxy: {}
+  websocket-server:
+    ipam:
+        driver: default
+        config:
+          - subnet: "172.16.238.0/24"
+

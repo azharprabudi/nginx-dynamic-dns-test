@@ -1,0 +1,11 @@
+
+.:53 {
+  file /etc/coredns/zones/db.example.com example.com {
+    reload 5s
+  }
+
+  loadbalance round_robin
+  reload 5s
+
+  forward . /etc/resolv.conf
+}
